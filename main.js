@@ -15,7 +15,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio,2.5));
 renderer.setSize(innerWidth,innerHeight);
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure=.92;
+renderer.toneMappingExposure=1.0;
 
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0xb9b8b3);
@@ -23,6 +23,15 @@ scene.background=new THREE.Color(0xb9b8b3);
 const camera=new THREE.PerspectiveCamera(30,innerWidth/innerHeight,.1,100);
 camera.position.set(0,0,8);
 camera.lookAt(0,0,0);
+
+// Broad studio illumination for a readable dark reflective mass.
+scene.add(new THREE.HemisphereLight(0xe8e6df,0x777872,1.35));
+const keyLight=new THREE.DirectionalLight(0xffffff,2.1);
+keyLight.position.set(-3,4,5);
+scene.add(keyLight);
+const fillLight=new THREE.DirectionalLight(0xd8dde2,1.0);
+fillLight.position.set(4,1,3);
+scene.add(fillLight);
 
 const organism={
   energy:.015,tension:.012,memory:0,overload:0,
@@ -83,123 +92,9 @@ const impulseDir=Array.from({length:4},()=>new THREE.Vector3(0,1,0));
 const impulseTime=new Float32Array(4).fill(-100);
 const impulseAmp=new Float32Array(4);
 
-const vertexShader=`
-uniform float uTime;
-uniform float uEnergy;
-uniform float uTension;
-uniform float uMemory;
-uniform float uOverload;
-uniform float uBreath;
-uniform float uChord;
-uniform vec3 uNoteDir;
-uniform float uNotePulse;
-
-varying vec3 vWorld;
-varying vec3 vNormalObject;
-varying float vHeight;
-
-float ridge(vec3 n, vec3 d, float width){
-  float q=max(dot(n,d),0.0);
-  return pow(q,width);
-}
-
-float surfaceHeight(vec3 n){
-  float h=0.0;
-  h += pow(max(dot(n,normalize(vec3(0.72,0.34,0.61))),0.0),22.0)*0.060;
-  h += pow(max(dot(n,normalize(vec3(-0.58,0.52,0.62))),0.0),28.0)*0.052;
-  h += pow(max(dot(n,normalize(vec3(0.12,-0.82,0.56))),0.0),24.0)*0.046;
-  h += pow(max(dot(n,normalize(vec3(-0.62,-0.28,-0.72))),0.0),30.0)*0.040;
-
-  float organic=sin(n.x*4.7+n.y*2.1)+sin(n.z*5.3-n.x*1.7)+sin(n.y*6.1+n.z*2.4);
-  h += organic*0.008;
-
-  float q=max(dot(n,uNoteDir),0.0);
-  float local=pow(q,30.0);
-  float halo=pow(q,8.0);
-  h += (local*0.105 + halo*0.020)*uNotePulse;
-
-  h += uMemory*0.012*(0.5+0.5*sin(n.x*3.0+n.z*4.0));
-  return h;
-}
-
-void main(){
-  vec3 n=normalize(position);
-  float h=surfaceHeight(n);
-  float breath=sin(uBreath)*0.5+0.5;
-
-  float radius=0.76+h;
-  radius += breath*0.003;
-  radius += uEnergy*0.010;
-  radius -= uOverload*0.018;
-
-  vec3 p=n*radius;
-  p.x*=1.025;
-  p.y*=0.995;
-  p.z*=0.975;
-
-  float twist=uChord*0.045*(n.y+0.2);
-  float cs=cos(twist), sn=sin(twist);
-  p.xz=mat2(cs,-sn,sn,cs)*p.xz;
-
-  vec4 world=modelMatrix*vec4(p,1.0);
-  vWorld=world.xyz;
-  vNormalObject=n;
-  vHeight=h;
-  gl_Position=projectionMatrix*viewMatrix*world;
-}
-`;
-
-const fragmentShader=`
-uniform float uTension;
-uniform float uOverload;
-uniform float uTime;
-
-varying vec3 vWorld;
-varying vec3 vNormalObject;
-varying float vHeight;
-
-void main(){
-  vec3 N=normalize(normalMatrix*vNormalObject);
-  vec3 V=normalize(cameraPosition-vWorld);
-
-  float ndv=max(dot(N,V),0.0);
-  float fresnel=pow(1.0-ndv,2.6);
-
-  vec3 L1=normalize(vec3(-0.48,0.70,0.82));
-  vec3 L2=normalize(vec3(0.72,0.25,0.64));
-  vec3 H1=normalize(L1+V);
-  vec3 H2=normalize(L2+V);
-
-  float s1=pow(max(dot(N,H1),0.0),55.0);
-  float s2=pow(max(dot(N,H2),0.0),80.0);
-
-  vec3 graphite=vec3(0.030,0.034,0.038);
-  vec3 reflection=vec3(0.30,0.34,0.38)*fresnel;
-  float diffuse=0.5+0.5*max(dot(N,L1),0.0);
-  vec3 highlight=vec3(0.62,0.66,0.70)*s1*0.42;
-  highlight+=vec3(0.16,0.18,0.20)*diffuse;
-  highlight+=vec3(0.40,0.46,0.52)*s2*0.22;
-
-  float stress=smoothstep(0.10,0.75,uTension+uOverload);
-  vec3 body=graphite+reflection+highlight;
-  body+=vec3(0.012,0.016,0.020)*stress*fresnel;
-
-  gl_FragColor=vec4(body,1.0);
-}
-`;
-
-const uniforms={
-  uTime:{value:0},uEnergy:{value:0},uTension:{value:0},uMemory:{value:0},
-  uOverload:{value:0},uBreath:{value:0},uChord:{value:0},
-  uNoteDir:{value:new THREE.Vector3(0,1,0)},uNotePulse:{value:0}
-};
-
-const material=new THREE.ShaderMaterial({uniforms,vertexShader,fragmentShader,side:THREE.FrontSide,flatShading:false});
-const geometry=new THREE.SphereGeometry(1,384,256);
-const body=new THREE.Mesh(geometry,material);
-body.scale.set(1.12,1.10,1.04);
-scene.add(body);
-
+// Robust render path: standard Three.js material handles lighting.
+// The custom deformation is injected only into the vertex stage, so a shader
+// compile problem cannot blank the entire object.
 let impulseIndex=0;
 function addImpulse(midi,velocity){
   const i=impulseIndex++%4;
