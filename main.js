@@ -110,9 +110,9 @@ float surfaceHeight(vec3 n){
   float h=0.0;
   float broad=0.0;
   for(int i=0;i<96;i++){
-    float p=angularPeak(n,uDirections[i],0.020);
+    float p=angularPeak(n,uDirections[i],0.028);
     h+=p*uPeakHeight[i];
-    broad+=angularPeak(n,uDirections[i],0.075)*uPeakHeight[i]*0.18;
+    broad+=angularPeak(n,uDirections[i],0.095)*uPeakHeight[i]*0.18;
   }
 
   // Dense magnetic field: a continuous low relief connects neighbouring peaks.
@@ -147,7 +147,7 @@ void main(){
   float radius=.73+h;
   radius+=breath*.004;
   radius+=uEnergy*.012;
-  radius+=sin(n.y*3.1415)*uChord*.010;
+  radius+=sin(n.y*3.1415)*uChord*.016;
 
   // Overload changes the regime: peaks become sharper and the body contracts.
   float overloadPeak=surfaceHeight(n)-.10;
@@ -226,9 +226,9 @@ const uniforms={
 };
 
 const material=new THREE.ShaderMaterial({uniforms,vertexShader,fragmentShader,side:THREE.FrontSide});
-const geometry=new THREE.SphereGeometry(1,128,80);
+const geometry=new THREE.SphereGeometry(1,256,160);
 const body=new THREE.Mesh(geometry,material);
-body.scale.set(1.62,1.58,1.46);
+body.scale.set(1.28,1.25,1.18);
 scene.add(body);
 
 let impulseIndex=0;
@@ -320,12 +320,12 @@ function updateChord(){
   if(notes.length<2)return;
   const spread=Math.max(...notes)-Math.min(...notes);
   const sum=notes.reduce((a,n)=>a+n,0);
-  const gain=.006+organism.tension*.004;
+  const gain=.018+organism.tension*.010;
   organism.targetOrientation.x+=Math.sin(sum*.071)*gain;
   organism.targetOrientation.y+=Math.cos(spread*.29)*gain;
   organism.targetOrientation.z+=Math.sin(spread*.17)*gain;
-  organism.targetOrientation.clampLength(0,.38);
-  organism.chordPulse=Math.min(1,organism.chordPulse+.08);
+  organism.targetOrientation.clampLength(0,.72);
+  organism.chordPulse=Math.min(1,organism.chordPulse+.16);
   // Chords act on the whole mass: a slow torsional state, not local spikes.
   organism.energy=Math.min(1,organism.energy+.006*notes.length);
   organism.tension=Math.min(1,organism.tension+.004*notes.length);
@@ -353,12 +353,13 @@ function update(dt){
   organism.chordPulse=Math.max(0,organism.chordPulse-dt*.035);
   uniforms.uChord.value=organism.chordPulse;
 
-  organism.orientation.lerp(organism.targetOrientation,1-Math.exp(-dt*.65));
+  organism.orientation.lerp(organism.targetOrientation,1-Math.exp(-dt*.9));
+  organism.targetOrientation.multiplyScalar(Math.exp(-dt*.055));
   body.rotation.set(organism.orientation.x,organism.orientation.y,organism.orientation.z);
 
   const breath=Math.sin(organism.breathPhase)*.5+.5;
   const s=1+breath*.003+organism.energy*.008-organism.overload*.012;
-  body.scale.lerp(new THREE.Vector3(1.62*s,1.58*s,1.46*s),1-Math.exp(-dt*2));
+  body.scale.lerp(new THREE.Vector3(1.28*s,1.25*s,1.18*s),1-Math.exp(-dt*2));
 
   energyEl.style.width=Math.min(100,organism.energy*100)+'%';
   tensionEl.style.width=Math.min(100,organism.tension*100)+'%';
