@@ -1,2 +1,29 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#e9e8e3"><title>La mémoire du corps</title><link rel="stylesheet" href="./style.css"><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.181.1/build/three.module.js"}}</script></head><body><main id="app"><canvas id="scene"></canvas><div class="hud"><div>LA MÉMOIRE DU CORPS</div><div id="state">REPOS</div><small>clavier · toucher · MIDI · espace : arpège</small></div><div class="meter"><span id="energy"></span></div></main><script type="module" src="./main.js"></script></body></html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#e9e8e3">
+<title>La mémoire du corps</title>
+<link rel="stylesheet" href="./style.css">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.181.1/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.181.1/examples/jsm/"}}</script>
+</head>
+<body>
+<main id="app">
+<canvas id="scene"></canvas>
+<section class="hud" aria-hidden="true">
+  <div class="hud-title">LA MÉMOIRE DU CORPS</div>
+  <div class="hud-state" id="state">RESPIRATION · 72 BPM</div>
+  <div class="hud-grid">
+    <span>ÉNERGIE</span><i><b id="energy"></b></i>
+    <span>TENSION</span><i><b id="tension"></b></i>
+    <span>MÉMOIRE</span><i><b id="memory"></b></i>
+    <span>SURCHARGE</span><i><b id="overload"></b></i>
+  </div>
+  <div class="hud-meta"><span>RESPIRATION <strong id="breath">72 BPM</strong></span><span>RÉPÉTITION <strong id="repeat">0 / 4</strong></span><span>ARPÈGE <strong id="arp">OFF</strong></span></div>
+  <small>A–J / AZERTY · MIDI · ESPACE : ARPÈGE</small>
+</section>
+</main>
+<script type="module" src="./main.js"></script>
+</body>
+</html>
