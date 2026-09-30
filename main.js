@@ -36,11 +36,18 @@ const organism={
 
 let audioContext=null,master=null;
 function audio(){
-  if(audioContext)return;
+  if(audioContext){ audioContext.resume().catch(()=>{}); return; }
   audioContext=new AudioContext();
   master=audioContext.createGain();
-  master.gain.value=.06;
-  master.connect(audioContext.destination);
+  master.gain.value=.12;
+  const compressor=audioContext.createDynamicsCompressor();
+  compressor.threshold.value=-24;
+  compressor.knee.value=18;
+  compressor.ratio.value=5;
+  compressor.attack.value=.003;
+  compressor.release.value=.18;
+  master.connect(compressor).connect(audioContext.destination);
+  audioContext.resume().catch(()=>{});
 }
 function freq(n){return 440*Math.pow(2,(n-69)/12)}
 function tone(n,v=.7){
@@ -53,12 +60,12 @@ function tone(n,v=.7){
   o.connect(g).connect(master);o.start();o.stop(audioContext.currentTime+.4);
 }
 
-const geometry=new THREE.IcosahedronGeometry(1.55,7);
+const geometry=new THREE.IcosahedronGeometry(1.62,7);
 const base=geometry.attributes.position.array.slice();
 const normals=geometry.attributes.normal.array;
 const material=new THREE.MeshPhysicalMaterial({
   color:0x090a0b,metalness:.98,roughness:.09,clearcoat:1,clearcoatRoughness:.035,
-  transmission:.035,thickness:1.8,ior:1.45
+  transmission:0,thickness:1,ior:1.45
 });
 const slime=new THREE.Mesh(geometry,material);
 scene.add(slime);
@@ -123,19 +130,6 @@ addEventListener('keydown',e=>{
 addEventListener('keyup',e=>held.delete(e.key));
 addEventListener('blur',()=>held.clear());
 
-let pointerDown=false;
-function touch(e){
-  const r=canvas.getBoundingClientRect();
-  const x=(e.clientX-r.left)/r.width;
-  const y=(e.clientY-r.top)/r.height;
-  const n=48+Math.round(Math.max(0,Math.min(1,x))*36);
-  note(n,.55+Math.abs(y-.5)*.7,'touch');
-}
-canvas.addEventListener('pointerdown',e=>{pointerDown=true;canvas.setPointerCapture?.(e.pointerId);touch(e)});
-canvas.addEventListener('pointermove',e=>{if(pointerDown)touch(e)});
-canvas.addEventListener('pointerup',()=>pointerDown=false);
-canvas.addEventListener('pointercancel',()=>pointerDown=false);
-
 if(navigator.requestMIDIAccess){
   navigator.requestMIDIAccess().then(a=>{
     for(const input of a.inputs.values()){
@@ -176,6 +170,7 @@ function update(dt){
   if(silent>60)organism.dormant=true;
 
   const breath=Math.sin(organism.breathPhase)*.5+.5;
+  const stress=Math.min(1,organism.tension*.65+organism.overload*.75);
   const calmMicro=.008+breath*.004;
   const activity=Math.min(1.4,organism.energy+organism.tension*.7);
   const overload=Math.min(1,organism.overload);
@@ -196,13 +191,15 @@ function update(dt){
     const bx=base[i*3],by=base[i*3+1],bz=base[i*3+2];
     v.set(bx,by,bz);n.set(normals[i*3],normals[i*3+1],normals[i*3+2]);
     let d=calmMicro*Math.sin(elapsed*.75+bx*2.1+by*1.6)+.006*Math.sin(elapsed*1.7+bz*2.8)+breath*.009;
+    d += .018*Math.sin(bx*2.7+by*3.4+bz*1.9+elapsed*.18) * (0.65+organism.memory*.9);
     for(const impulse of organism.impulses){
       const alignment=Math.max(0,n.dot(impulse.d));
       d+=Math.sin(impulse.age*8-alignment*3.2)*alignment*impulse.s*.075;
     }
-    for(const w of organism.waves)d+=Math.exp(-Math.pow((v.length()-1.35-w.r*.11)*7,2))*w.s*.11;
+    for(const w of organism.waves)d+=Math.exp(-Math.pow((v.length()-1.15-w.r*.16)*9,2))*w.s*.22;
     d+=overload*Math.sin(elapsed*12+bx*5+by*4)*.06;
-    d+=organism.memory*.02*Math.sin(bx*3.7+bz*2.1);
+    d+=organism.memory*.055*Math.sin(bx*3.7+bz*2.1+by*1.4);
+    d+=stress*.035*Math.sin(bx*4.6-by*3.1+bz*2.8+elapsed*.9);
     pos.setXYZ(i,bx+n.x*d,by+n.y*d,bz+n.z*d);
   }
   pos.needsUpdate=true;
