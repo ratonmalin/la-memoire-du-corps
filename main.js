@@ -83,7 +83,7 @@ for(let i=0;i<24;i++){
 const peakArray=new Float32Array(34*3);
 peakDirections.forEach((v,i)=>{peakArray[i*3]=v.x;peakArray[i*3+1]=v.y;peakArray[i*3+2]=v.z});
 
-const scarArray=new Float32Array(24*3);
+const scarArray=new Float32Array(24);
 const scarStrength=new Float32Array(24);
 
 const vertexShader=\`
@@ -220,19 +220,18 @@ const material=new THREE.ShaderMaterial({
   uniforms,vertexShader,fragmentShader,side:THREE.FrontSide
 });
 
-const geometry=new THREE.SphereGeometry(1,128,80);
+const geometry=new THREE.SphereGeometry(1,112,72);
 const body=new THREE.Mesh(geometry,material);
-body.scale.setScalar(2.12);
+body.scale.set(2.16,2.02,1.78);
 scene.add(body);
 
 function addScar(){
   const i=Math.floor((organism.memory*97+organism.repeat*11)%scarDirections.length);
-  const j=organism.scars.length%24;
   organism.scars.push({index:i,amount:.035+organism.memory*.028});
   if(organism.scars.length>24)organism.scars.shift();
-  for(let k=0;k<24;k++){scarArray[k]=0}
+  for(let k=0;k<24;k++)scarArray[k]=0
   organism.scars.forEach((s,k)=>{scarArray[s.index]+=s.amount*.62});
-  uniforms.uScars.value=scarDirections.map(v=>v.clone());
+  uniforms.uScars.value=scarDirections;
   uniforms.uScarStrength.value=scarArray;
 }
 
@@ -332,7 +331,8 @@ function update(dt){
 
   const breath=Math.sin(organism.breathPhase)*.5+.5;
   const scale=1+breath*.012+organism.energy*.01-organism.overload*.014;
-  body.scale.lerp(new THREE.Vector3(2.12*scale,2.12*scale,2.12*scale),1-Math.exp(-dt*2.4));
+  const targetScale=new THREE.Vector3(2.16*scale,2.02*scale,1.78*scale);
+  body.scale.lerp(targetScale,1-Math.exp(-dt*2.4));
 
   energyEl.style.width=Math.min(100,organism.energy/1.05*100)+'%';
   tensionEl.style.width=Math.min(100,organism.tension/1.05*100)+'%';
