@@ -12,18 +12,20 @@ renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=1.15;
 
 const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x020304);
+scene.background=new THREE.Color(0xe9e8e3);
+scene.fog=new THREE.Fog(0xe9e8e3,7,13);
 
 const camera=new THREE.PerspectiveCamera(38,innerWidth/innerHeight,.1,100);
-camera.position.set(0,0,6.4);
+camera.position.set(0,0,7.2);
 
-scene.add(new THREE.HemisphereLight(0x78808c,0x050505,1.5));
-const key=new THREE.PointLight(0xffffff,20,12);
+scene.add(new THREE.HemisphereLight(0xffffff,0x8f8e88,2.2));
+const key=new THREE.PointLight(0xffffff,34,14);
 key.position.set(2.5,3,4);
 scene.add(key);
-const rim=new THREE.PointLight(0x607cff,14,10);
-rim.position.set(-3,-1,-2);
+const rim=new THREE.PointLight(0xcfd6e5,18,11);
+rim.position.set(-4,1.2,1.5);
 scene.add(rim);
+const back=new THREE.PointLight(0xffffff,24,12); back.position.set(1,-3,-3); scene.add(back);
 
 const organism={
   energy:.08,tension:.04,memory:0,breathPhase:0,bpm:72,
@@ -37,26 +39,26 @@ function audio(){
   if(audioContext)return;
   audioContext=new AudioContext();
   master=audioContext.createGain();
-  master.gain.value=.045;
+  master.gain.value=.06;
   master.connect(audioContext.destination);
 }
 function freq(n){return 440*Math.pow(2,(n-69)/12)}
 function tone(n,v=.7){
   audio();
   const o=audioContext.createOscillator(),g=audioContext.createGain();
-  o.type='sine';o.frequency.value=freq(n);
+  o.type='triangle';o.frequency.value=freq(n);
   g.gain.setValueAtTime(.0001,audioContext.currentTime);
-  g.gain.exponentialRampToValueAtTime(Math.max(.002,v*.055),audioContext.currentTime+.02);
+  g.gain.exponentialRampToValueAtTime(Math.max(.003,v*.065),audioContext.currentTime+.025);
   g.gain.exponentialRampToValueAtTime(.0001,audioContext.currentTime+.36);
   o.connect(g).connect(master);o.start();o.stop(audioContext.currentTime+.4);
 }
 
-const geometry=new THREE.IcosahedronGeometry(1.72,7);
+const geometry=new THREE.IcosahedronGeometry(1.55,7);
 const base=geometry.attributes.position.array.slice();
 const normals=geometry.attributes.normal.array;
 const material=new THREE.MeshPhysicalMaterial({
-  color:0x14171b,metalness:.92,roughness:.17,clearcoat:1,clearcoatRoughness:.08,
-  transmission:.08,thickness:1.4,ior:1.42
+  color:0x090a0b,metalness:.98,roughness:.09,clearcoat:1,clearcoatRoughness:.035,
+  transmission:.035,thickness:1.8,ior:1.45
 });
 const slime=new THREE.Mesh(geometry,material);
 scene.add(slime);
@@ -93,10 +95,11 @@ function note(n,v=.8,source='keyboard'){
     organism.tension=Math.min(1.5,organism.tension+.5);
   }
 
-  const a=((n-48)/36)*Math.PI*2;
-  const p=((n%12)/12)*Math.PI;
+  const seed=organism.memory*19+organism.tension*7;
+  const a=n*.37+seed;
+  const p=n*.17+organism.energy*4.1;
   organism.impulses.push({
-    d:new THREE.Vector3(Math.cos(a)*Math.sin(p),Math.cos(p),Math.sin(a)*Math.sin(p)).normalize(),
+    d:new THREE.Vector3(Math.cos(a)*Math.cos(p),Math.sin(p),Math.sin(a)*Math.cos(p)).normalize(),
     s:.25+v,age:0
   });
   organism.waves.push({r:.1,s:.3+v,age:0});
@@ -168,14 +171,15 @@ function update(dt){
   organism.breathPhase=(organism.breathPhase+dt*(organism.bpm/60/2)*Math.PI*2)%(Math.PI*2);
   organism.energy=Math.max(0,organism.energy-dt*.07);
   organism.tension=Math.max(0,organism.tension-dt*.045);
-  organism.memory=Math.max(0,organism.memory-dt*.0006);
+  organism.memory=Math.max(0,organism.memory-dt*.00002);
   organism.overload=Math.max(0,organism.overload-dt*.9);
   if(silent>60)organism.dormant=true;
 
   const breath=Math.sin(organism.breathPhase)*.5+.5;
+  const calmMicro=.008+breath*.004;
   const activity=Math.min(1.4,organism.energy+organism.tension*.7);
   const overload=Math.min(1,organism.overload);
-  const scale=.96+breath*.075+activity*.05-overload*.04;
+  const scale=1+breath*.028+activity*.035-overload*.045;
   slime.scale.lerp(new THREE.Vector3(scale,scale*.98,scale),1-Math.exp(-dt*3));
 
   organism.orientation.lerp(organism.targetOrientation,1-Math.exp(-dt*1.2));
@@ -191,22 +195,23 @@ function update(dt){
   for(let i=0;i<pos.count;i++){
     const bx=base[i*3],by=base[i*3+1],bz=base[i*3+2];
     v.set(bx,by,bz);n.set(normals[i*3],normals[i*3+1],normals[i*3+2]);
-    let d=Math.sin(elapsed*.7+bx*2.2+by*1.7)*.012+Math.sin(elapsed*1.3+bz*3.1)*.009+breath*.018;
+    let d=calmMicro*Math.sin(elapsed*.75+bx*2.1+by*1.6)+.006*Math.sin(elapsed*1.7+bz*2.8)+breath*.009;
     for(const impulse of organism.impulses){
       const alignment=Math.max(0,n.dot(impulse.d));
-      d+=Math.sin(impulse.age*7-alignment*2)*alignment*impulse.s*.17;
+      d+=Math.sin(impulse.age*8-alignment*3.2)*alignment*impulse.s*.075;
     }
-    for(const w of organism.waves)d+=Math.sin(w.r*7-v.length()*5)*w.s*.032;
+    for(const w of organism.waves)d+=Math.exp(-Math.pow((v.length()-1.35-w.r*.11)*7,2))*w.s*.11;
     d+=overload*Math.sin(elapsed*12+bx*5+by*4)*.06;
-    d+=organism.memory*.035*Math.sin(bx*3.7+bz*2.1);
+    d+=organism.memory*.02*Math.sin(bx*3.7+bz*2.1);
     pos.setXYZ(i,bx+n.x*d,by+n.y*d,bz+n.z*d);
   }
   pos.needsUpdate=true;
   geometry.computeVertexNormals();
 
-  energyEl.style.transform='scaleX('+Math.min(1,organism.energy)+')';
+  energyEl.style.height=`${Math.min(100,Math.max(2,organism.energy/1.4*100))}%`;
   if(organism.dormant)stateEl.textContent='SOMMEIL · MÉMOIRE CONSERVÉE';
   else if(organism.overload>.35)stateEl.textContent='SURCHARGE · DÉCHARGE';
+  else if(silent>60)stateEl.textContent='CALME · MÉMOIRE CONSERVÉE';
   else stateEl.textContent='RESPIRATION · '+organism.bpm+' BPM';
 }
 
