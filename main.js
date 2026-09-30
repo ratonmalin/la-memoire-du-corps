@@ -91,79 +91,55 @@ uniform float uMemory;
 uniform float uOverload;
 uniform float uBreath;
 uniform float uChord;
-uniform vec3 uDirections[96];
-uniform float uPeakHeight[96];
-uniform vec3 uImpulseDirection[4];
-uniform float uImpulseTime[4];
-uniform float uImpulseAmp[4];
+uniform vec3 uNoteDir;
+uniform float uNotePulse;
 
 varying vec3 vWorld;
 varying vec3 vNormalObject;
 varying float vHeight;
 
-float angularPeak(vec3 n, vec3 d, float width){
+float ridge(vec3 n, vec3 d, float width){
   float q=max(dot(n,d),0.0);
-  return exp((q-1.0)/width);
+  return pow(q,width);
 }
 
 float surfaceHeight(vec3 n){
   float h=0.0;
-  float broad=0.0;
-  for(int i=0;i<96;i++){
-    float p=angularPeak(n,uDirections[i],0.028);
-    h+=p*uPeakHeight[i];
-    broad+=angularPeak(n,uDirections[i],0.095)*uPeakHeight[i]*0.18;
-  }
+  h += pow(max(dot(n,normalize(vec3(0.72,0.34,0.61))),0.0),22.0)*0.060;
+  h += pow(max(dot(n,normalize(vec3(-0.58,0.52,0.62))),0.0),28.0)*0.052;
+  h += pow(max(dot(n,normalize(vec3(0.12,-0.82,0.56))),0.0),24.0)*0.046;
+  h += pow(max(dot(n,normalize(vec3(-0.62,-0.28,-0.72))),0.0),30.0)*0.040;
 
-  // Dense magnetic field: a continuous low relief connects neighbouring peaks.
-  h+=broad;
+  float organic=sin(n.x*4.7+n.y*2.1)+sin(n.z*5.3-n.x*1.7)+sin(n.y*6.1+n.z*2.4);
+  h += organic*0.008;
 
-  // A note raises a compact magnetic peak. No travelling ring: the
-  // disturbance is a local spike that relaxes into the surrounding surface.
-  for(int i=0;i<4;i++){
-    float age=uTime-uImpulseTime[i];
-    if(age>=0.0 && age<1.8){
-      float q=max(dot(n,uImpulseDirection[i]),0.0);
-      float local=exp((q-1.0)/.018);
-      float halo=exp((q-1.0)/.075);
-      float pulse=exp(-age*2.8);
-      h+=(local*.075 + halo*.018)*uImpulseAmp[i]*pulse;
-    }
-  }
+  float q=max(dot(n,uNoteDir),0.0);
+  float local=pow(q,30.0);
+  float halo=pow(q,8.0);
+  h += (local*0.105 + halo*0.020)*uNotePulse;
 
-  float fine=sin(n.x*31.0+n.y*17.0+n.z*11.0)*sin(n.z*23.0-n.x*7.0);
-  h+=max(0.0,fine)*.008*(.4+uTension);
-
+  h += uMemory*0.012*(0.5+0.5*sin(n.x*3.0+n.z*4.0));
   return h;
 }
 
 void main(){
   vec3 n=normalize(position);
   float h=surfaceHeight(n);
+  float breath=sin(uBreath)*0.5+0.5;
 
-  // One compact ferrofluid mass. The magnetic relief changes the silhouette,
-  // while the body remains physically continuous.
-  float breath=sin(uBreath)*.5+.5;
-  float radius=.73+h;
-  radius+=breath*.004;
-  radius+=uEnergy*.012;
-  radius+=sin(n.y*3.1415)*uChord*.016;
-
-  // Overload changes the regime: peaks become sharper and the body contracts.
-  float overloadPeak=surfaceHeight(n)-.10;
-  radius+=overloadPeak*uOverload*.95;
-  radius-=uOverload*.045;
+  float radius=0.76+h;
+  radius += breath*0.003;
+  radius += uEnergy*0.010;
+  radius -= uOverload*0.018;
 
   vec3 p=n*radius;
+  p.x*=1.025;
+  p.y*=0.995;
+  p.z*=0.975;
 
-  // Slightly oblate, weighted mass rather than a geometric ball.
-  p.x*=1.06;
-  p.y*=.97;
-  p.z*=.88;
-
-  // Keep the mass compact and soft, with only a very slight weighted base.
-  float lower=smoothstep(-.9,-.35,n.y);
-  p.y+=lower*.018;
+  float twist=uChord*0.045*(n.y+0.2);
+  float cs=cos(twist), sn=sin(twist);
+  p.xz=mat2(cs,-sn,sn,cs)*p.xz;
 
   vec4 world=modelMatrix*vec4(p,1.0);
   vWorld=world.xyz;
@@ -187,32 +163,24 @@ void main(){
   vec3 V=normalize(cameraPosition-vWorld);
 
   float ndv=max(dot(N,V),0.0);
-  float fresnel=pow(1.0-ndv,3.2);
+  float fresnel=pow(1.0-ndv,2.6);
 
-  // Large studio-like reflections rather than a flat black material.
-  vec3 L1=normalize(vec3(-.55,.72,.92));
-  vec3 L2=normalize(vec3(.78,.18,.62));
+  vec3 L1=normalize(vec3(-0.48,0.70,0.82));
+  vec3 L2=normalize(vec3(0.72,0.25,0.64));
   vec3 H1=normalize(L1+V);
   vec3 H2=normalize(L2+V);
 
-  float spec1=pow(max(dot(N,H1),0.0),95.0);
-  float spec2=pow(max(dot(N,H2),0.0),150.0);
+  float s1=pow(max(dot(N,H1),0.0),55.0);
+  float s2=pow(max(dot(N,H2),0.0),80.0);
 
-  float top=clamp(N.y*.5+.5,0.0,1.0);
-  float side=1.0-abs(N.x)*.35;
+  vec3 graphite=vec3(0.012,0.014,0.016);
+  vec3 reflection=vec3(0.24,0.28,0.31)*fresnel;
+  vec3 highlight=vec3(0.72,0.76,0.80)*s1*0.58;
+  highlight+=vec3(0.48,0.54,0.60)*s2*0.36;
 
-  vec3 graphite=vec3(.0065,.0075,.0085);
-  vec3 reflection=vec3(.38,.42,.46)*fresnel*.72;
-  reflection+=vec3(.12,.15,.18)*top;
-  vec3 highlight=vec3(.92,.94,.96)*spec1*.95;
-  highlight+=vec3(.66,.74,.82)*spec2*.62;
-
-  // Fine reflected structure follows the relief, not a painted texture.
-  float glint=pow(max(0.0,sin(vHeight*70.0+uTime*.7)),22.0)*.035;
-  vec3 body=graphite*(.28+.72*side)+reflection+highlight+vec3(glint);
-
-  float stress=smoothstep(.12,.8,uTension+uOverload);
-  body+=vec3(.018,.024,.032)*stress*fresnel;
+  float stress=smoothstep(0.10,0.75,uTension+uOverload);
+  vec3 body=graphite+reflection+highlight;
+  body+=vec3(0.012,0.016,0.020)*stress*fresnel;
 
   gl_FragColor=vec4(body,1.0);
 }
@@ -221,8 +189,7 @@ void main(){
 const uniforms={
   uTime:{value:0},uEnergy:{value:0},uTension:{value:0},uMemory:{value:0},
   uOverload:{value:0},uBreath:{value:0},uChord:{value:0},
-  uDirections:{value:dirArray},uPeakHeight:{value:peakArray},
-  uImpulseDirection:{value:impulseDir},uImpulseTime:{value:impulseTime},uImpulseAmp:{value:impulseAmp}
+  uNoteDir:{value:new THREE.Vector3(0,1,0)},uNotePulse:{value:0}
 };
 
 const material=new THREE.ShaderMaterial({uniforms,vertexShader,fragmentShader,side:THREE.FrontSide,flatShading:false});
@@ -238,7 +205,7 @@ function addImpulse(midi,velocity){
   const y=Math.sin(midi*.071+organism.tension*2.0)*.48;
   impulseDir[i].set(Math.cos(a),y,Math.sin(a)).normalize();
   impulseTime[i]=clock.elapsedTime;
-  impulseAmp[i]=.8+velocity*.55+organism.tension*.25;
+  impulseAmp[i]=.8+velocity*.55+organism.tension*.25;\n  uniforms.uNoteDir.value.copy(impulseDir[i]);\n  uniforms.uNotePulse.value=impulseAmp[i];
 }
 
 function stimulatePeaks(midi,velocity){
@@ -362,7 +329,7 @@ function update(dt){
   uniforms.uOverload.value=organism.overload;
   uniforms.uBreath.value=organism.breathPhase;
   organism.chordPulse=Math.max(0,organism.chordPulse-dt*.035);
-  uniforms.uChord.value=organism.chordPulse;
+  uniforms.uChord.value=organism.chordPulse;\n  uniforms.uNotePulse.value=Math.max(0,uniforms.uNotePulse.value-dt*2.8);
 
   organism.orientation.lerp(organism.targetOrientation,1-Math.exp(-dt*.9));
   organism.targetOrientation.multiplyScalar(Math.exp(-dt*.055));
