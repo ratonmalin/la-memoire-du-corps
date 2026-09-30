@@ -175,7 +175,9 @@ void main(){
 
   vec3 graphite=vec3(0.030,0.034,0.038);
   vec3 reflection=vec3(0.30,0.34,0.38)*fresnel;
-  float diffuse=0.5+0.5*max(dot(N,L1),0.0);\n  vec3 highlight=vec3(0.62,0.66,0.70)*s1*0.42;\n  highlight+=vec3(0.16,0.18,0.20)*diffuse;
+  float diffuse=0.5+0.5*max(dot(N,L1),0.0);
+  vec3 highlight=vec3(0.62,0.66,0.70)*s1*0.42;
+  highlight+=vec3(0.16,0.18,0.20)*diffuse;
   highlight+=vec3(0.40,0.46,0.52)*s2*0.22;
 
   float stress=smoothstep(0.10,0.75,uTension+uOverload);
