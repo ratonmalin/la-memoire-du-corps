@@ -332,7 +332,18 @@ function updateChord(){
 }
 setInterval(updateChord,80);
 
-function fitCamera(){\n  const maxBodyScale=Math.max(body.scale.x,body.scale.y,body.scale.z);\n  const maxRadius=1.12*maxBodyScale*(.73+.34+organism.overload*.08);\n  const fovRad=THREE.MathUtils.degToRad(camera.fov);\n  const aspect=Math.max(camera.aspect,.1);\n  const verticalFit=maxRadius/Math.tan(fovRad*.5);\n  const horizontalFit=maxRadius/Math.tan(Math.atan(Math.tan(fovRad*.5)*aspect));\n  const distance=Math.max(verticalFit,horizontalFit)*1.28;\n  camera.position.z=THREE.MathUtils.lerp(camera.position.z,distance,0.12);\n}\n\nfunction update(dt){
+function fitCamera(){
+  const maxBodyScale=Math.max(body.scale.x,body.scale.y,body.scale.z);
+  const maxRadius=1.12*maxBodyScale*(.73+.34+organism.overload*.08);
+  const fovRad=THREE.MathUtils.degToRad(camera.fov);
+  const aspect=Math.max(camera.aspect,.1);
+  const verticalFit=maxRadius/Math.tan(fovRad*.5);
+  const horizontalFit=maxRadius/Math.tan(Math.atan(Math.tan(fovRad*.5)*aspect));
+  const distance=Math.max(verticalFit,horizontalFit)*1.28;
+  camera.position.z=THREE.MathUtils.lerp(camera.position.z,distance,0.12);
+}
+
+function update(dt){
   uniforms.uTime.value=clock.elapsedTime;
 
   organism.breathPhase=(organism.breathPhase+dt*(organism.bpm/60)*Math.PI)%(Math.PI*2);
@@ -396,5 +407,6 @@ renderer.setAnimationLoop(()=>{
   }
 
   update(dt);
-  fitCamera();\n  renderer.render(scene,camera);
+  fitCamera();
+  renderer.render(scene,camera);
 });
