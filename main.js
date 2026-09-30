@@ -11,41 +11,44 @@ const repeatEl=document.querySelector('#repeat');
 const overloadEl=document.querySelector('#overload');
 const arpEl=document.querySelector('#arp');
 
-const renderer=new THREE.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:false});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
 renderer.setSize(innerWidth,innerHeight);
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure=1.28;
+renderer.toneMappingExposure=1.18;
 
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0xe9e8e3);
-scene.fog=new THREE.Fog(0xe9e8e3,7.5,14);
 
-const camera=new THREE.PerspectiveCamera(36,innerWidth/innerHeight,.1,100);
-camera.position.set(0,0,7.4);
+const camera=new THREE.PerspectiveCamera(35,innerWidth/innerHeight,.1,100);
+camera.position.set(0,0,7.6);
 camera.lookAt(0,0,0);
 
-scene.add(new THREE.HemisphereLight(0xffffff,0x77756f,2.8));
-const key=new THREE.PointLight(0xffffff,52,16);
-key.position.set(2.8,3.2,4.5);
+scene.add(new THREE.HemisphereLight(0xffffff,0x66645f,2.4));
+
+const key=new THREE.PointLight(0xffffff,70,15);
+key.position.set(3.2,3.5,4.8);
 scene.add(key);
-const rim=new THREE.PointLight(0xd9e0ec,30,13);
-rim.position.set(-4,1.4,2);
+
+const fill=new THREE.PointLight(0xd9e0ec,34,13);
+fill.position.set(-3.8,1.2,2.5);
+scene.add(fill);
+
+const rim=new THREE.PointLight(0xffffff,42,13);
+rim.position.set(1.5,-3.4,-3.5);
 scene.add(rim);
-const back=new THREE.PointLight(0xffffff,38,14);
-back.position.set(1,-3.2,-3);
-scene.add(back);
 
 const organism={
-  energy:.04,tension:.025,memory:0,breathPhase:0,bpm:72,
-  lastNote:null,repeat:0,lastInteraction:-Infinity,
-  overload:0,orientation:new THREE.Vector3(),targetOrientation:new THREE.Vector3(),
-  impulses:[],waves:[],scars:[],arpeggiator:false,arpIndex:0,arpTimer:0,
-  awakening:0,cohesion:1
+  energy:.035,tension:.02,memory:0,overload:0,cohesion:1,
+  breathPhase:0,bpm:72,lastInteraction:-Infinity,lastNote:null,repeat:0,
+  arpeggiator:false,arpIndex:0,arpTimer:0,
+  orientation:new THREE.Vector3(),targetOrientation:new THREE.Vector3(),
+  waves:[],scars:[]
 };
 
 let audioContext=null,master=null;
+
 function ensureAudio(){
   if(audioContext){
     if(audioContext.state!=='running')audioContext.resume().catch(()=>{});
@@ -55,308 +58,314 @@ function ensureAudio(){
   if(!AudioCtx)return;
   audioContext=new AudioCtx();
   master=audioContext.createGain();
-  master.gain.value=.34;
+  master.gain.value=.58;
   const compressor=audioContext.createDynamicsCompressor();
-  compressor.threshold.value=-20;
-  compressor.knee.value=14;
-  compressor.ratio.value=4;
-  compressor.attack.value=.004;
-  compressor.release.value=.22;
+  compressor.threshold.value=-18;
+  compressor.knee.value=10;
+  compressor.ratio.value=5;
+  compressor.attack.value=.003;
+  compressor.release.value=.18;
   master.connect(compressor).connect(audioContext.destination);
   audioContext.resume().catch(()=>{});
 }
-function freq(n){return 440*Math.pow(2,(n-69)/12)}
-function tone(n,v=.8){
+
+function frequency(midi){return 440*Math.pow(2,(midi-69)/12)}
+
+function playNote(midi,velocity=.8){
   ensureAudio();
   if(!audioContext||!master)return;
-  const t=audioContext.currentTime;
-  const root=audioContext.createOscillator();
-  const body=audioContext.createOscillator();
+  const now=audioContext.currentTime;
+  const f=frequency(midi);
+  const carrier=audioContext.createOscillator();
+  const sub=audioContext.createOscillator();
+  const shimmer=audioContext.createOscillator();
   const filter=audioContext.createBiquadFilter();
-  const g=audioContext.createGain();
-  root.type='sine';
-  body.type='triangle';
-  root.frequency.value=freq(n)*.5;
-  body.frequency.value=freq(n);
+  const gain=audioContext.createGain();
+
+  carrier.type='triangle';
+  carrier.frequency.setValueAtTime(f,now);
+  carrier.detune.setValueAtTime(organism.tension*18,now);
+  sub.type='sine';
+  sub.frequency.setValueAtTime(f*.5,now);
+  shimmer.type='sine';
+  shimmer.frequency.setValueAtTime(f*2.01,now);
   filter.type='lowpass';
-  filter.frequency.setValueAtTime(900+organism.tension*900,t);
-  filter.Q.value=1.1;
-  g.gain.setValueAtTime(.0001,t);
-  g.gain.exponentialRampToValueAtTime(Math.max(.018,v*.16),t+.018);
-  g.gain.exponentialRampToValueAtTime(.0001,t+.55);
-  root.connect(filter);
-  body.connect(filter);
-  filter.connect(g).connect(master);
-  root.start(t);body.start(t);
-  root.stop(t+.6);body.stop(t+.6);
+  filter.frequency.setValueAtTime(1050+organism.tension*1450,now);
+  filter.Q.setValueAtTime(1.8+organism.tension*2,now);
+  gain.gain.setValueAtTime(.0001,now);
+  gain.gain.exponentialRampToValueAtTime(.045+velocity*.24,now+.025);
+  gain.gain.exponentialRampToValueAtTime(.0001,now+.72);
+
+  carrier.connect(filter);
+  sub.connect(filter);
+  shimmer.connect(filter);
+  filter.connect(gain).connect(master);
+  carrier.start(now);sub.start(now);shimmer.start(now);
+  carrier.stop(now+.76);sub.stop(now+.76);shimmer.stop(now+.76);
 }
 
 const material=new THREE.MeshPhysicalMaterial({
-  color:0x050607,
-  metalness:1,
-  roughness:.075,
-  clearcoat:1,
-  clearcoatRoughness:.025,
-  transmission:0,
-  transparent:false,
-  opacity:1,
+  color:0x040506,metalness:1,roughness:.055,clearcoat:1,clearcoatRoughness:.02,
   side:THREE.FrontSide
 });
 
-const slime=new MarchingCubes(64,material,false,false,50000);
-slime.isolation=.58;
-slime.scale.setScalar(2.05);
-slime.position.set(0,0,0);
-slime.frustumCulled=false;
-scene.add(slime);
+// One continuous implicit surface. Notes deform this field; they never spawn
+// separate metaballs, so a note cannot create a visible sphere.
+const resolution=58;
+const body=new MarchingCubes(resolution,material,false,false,70000);
+body.isolation=0;
+body.scale.set(2.12,2.12,2.12);
+body.frustumCulled=false;
+scene.add(body);
 
-const fieldBalls=[
-  {p:new THREE.Vector3(-.16,.05,0),s:1.15},
-  {p:new THREE.Vector3(.17,-.02,.02),s:1.13},
-  {p:new THREE.Vector3(0,.16,-.08),s:1.02},
-  {p:new THREE.Vector3(0,-.18,.08),s:1.00}
-];
-const scarAnchors=[];
-function addScar(strength=.8){
-  const a=Math.random()*Math.PI*2;
-  const z=Math.random()*2-1;
+const cell=2/(resolution-1);
+const seedDirections=Array.from({length:24},(_,i)=>{
+  const a=i*2.3999632297;
+  const z=1-2*((i*.6180339887)%1);
   const r=Math.sqrt(Math.max(0,1-z*z));
-  const dir=new THREE.Vector3(r*Math.cos(a),z,r*Math.sin(a)).normalize();
-  scarAnchors.push({dir,life:1,strength});
-  if(scarAnchors.length>28)scarAnchors.shift();
-}
-function wake(){
-  addScar(.95);
-  organism.awakening=1;
+  return new THREE.Vector3(Math.cos(a)*r,z,Math.sin(a)*r);
+});
+
+function hashNoise(x,y,z){
+  const a=Math.sin(x*127.1+y*311.7+z*74.7)*43758.5453;
+  return a-Math.floor(a);
 }
 
-function note(n,v=.85,source='clavier'){
-  ensureAudio();
-  const now=performance.now()/1000;
-  const quiet=now-organism.lastInteraction>60;
-  organism.lastInteraction=now;
-  organism.repeat=organism.lastNote===n?organism.repeat+1:1;
-  organism.lastNote=n;
-  organism.energy=Math.min(1.6,organism.energy+v*.48);
-  organism.tension=Math.min(1.6,organism.tension+v*.3);
-  organism.memory=Math.min(1,organism.memory+.014);
-  if(quiet)wake();
+function organicNoise(x,y,z){
+  return Math.sin(x*3.2+y*1.7+z*2.1)*.5+
+    Math.sin(x*7.1-y*4.2+z*5.4)*.24+
+    Math.sin(x*13.7+y*9.1-z*8.3)*.10+
+    (hashNoise(x*3,y*3,z*3)-.5)*.16;
+}
 
-  if(organism.repeat>=4){
-    organism.overload=Math.min(1.5,organism.overload+.95);
-    organism.tension=Math.min(1.6,organism.tension+.58);
-    organism.cohesion=Math.max(.42,organism.cohesion-.18);
+function angularLobe(nx,ny,nz,direction,width){
+  const dot=nx*direction.x+ny*direction.y+nz*direction.z;
+  return Math.exp((dot-1)/width);
+}
+
+function fieldAt(x,y,z){
+  const r=Math.sqrt(x*x+y*y+z*z);
+  if(r>1.25)return -1;
+  const safeR=Math.max(r,.0001);
+  const nx=x/safeR,ny=y/safeR,nz=z/safeR;
+  const breath=Math.sin(organism.breathPhase)*.5+.5;
+  const stress=Math.min(1,organism.tension*.8+organism.overload*.9);
+
+  let radius=.57;
+  radius+=organicNoise(nx*1.3,ny*1.1,nz*1.2)*.032;
+  radius+=Math.sin(nx*4.7+nz*2.2)*.014;
+  radius+=Math.sin(ny*6.1-nx*2.8)*.011;
+  radius*=1+breath*.012+organism.energy*.018-organism.overload*.028;
+
+  const grain=
+    Math.pow(Math.max(0,Math.sin(nx*9.5+ny*2.1+nz*4.2)),8)*.026+
+    Math.pow(Math.max(0,Math.sin(nz*11.2-ny*3.7)),10)*.018;
+  radius+=grain*(.7+stress);
+
+  for(const wave of organism.waves){
+    const age=wave.age;
+    const phase=age*wave.speed;
+    const dot=nx*wave.direction.x+ny*wave.direction.y+nz*wave.direction.z;
+    const front=Math.exp(-Math.pow((dot-(1-phase*.92))/.075,2));
+    const returnFront=Math.exp(-Math.pow((dot+(1-phase*.76))/.11,2));
+    const lateral=.65+.35*Math.sin((dot+1)*8+age*7);
+    radius+=(front-returnFront*.32)*wave.amount*lateral;
   }
 
-  const a=n*.31+organism.memory*17+organism.tension*4;
-  const p=n*.13+organism.energy*2.7;
-  organism.impulses.push({
-    d:new THREE.Vector3(Math.cos(a)*Math.cos(p),Math.sin(p),Math.sin(a)*Math.cos(p)).normalize(),
-    s:.35+v,age:0
+  for(const scar of organism.scars){
+    radius+=angularLobe(nx,ny,nz,scar.direction,.028+scar.width)*scar.amount;
+  }
+
+  if(organism.overload>.05){
+    for(let i=0;i<7;i++){
+      const direction=seedDirections[(i+Math.floor(organism.memory*30))%seedDirections.length];
+      const lobe=angularLobe(nx,ny,nz,direction,.018);
+      radius+=lobe*organism.overload*(.045+.018*Math.sin(i*2.7+performance.now()*.001));
+    }
+  }
+
+  const coherence=1-Math.min(.22,organism.overload*.13);
+  return (radius-safeR)*coherence;
+}
+
+function rebuildBody(){
+  body.reset();
+  for(let iz=0;iz<resolution;iz++){
+    const z=-1+iz*cell;
+    for(let iy=0;iy<resolution;iy++){
+      const y=-1+iy*cell;
+      for(let ix=0;ix<resolution;ix++){
+        const x=-1+ix*cell;
+        body.setCell(ix,iy,iz,fieldAt(x,y,z));
+      }
+    }
+  }
+  body.update();
+}
+
+function addWave(midi,velocity){
+  const stateAngle=midi*.173+organism.memory*8.7+organism.tension*2.4;
+  const stateTilt=Math.sin(midi*.097+organism.energy*3.1);
+  const direction=new THREE.Vector3(Math.cos(stateAngle),stateTilt*.55,Math.sin(stateAngle)).normalize();
+
+  organism.waves.push({
+    direction,
+    amount:.052+velocity*.075+organism.tension*.018,
+    age:0,
+    speed:.78+organism.tension*.34
   });
-  organism.waves.push({r:0,s:.42+v,age:0,axis:new THREE.Vector3().randomDirection()});
-  if(organism.impulses.length>24)organism.impulses.shift();
-  if(organism.waves.length>18)organism.waves.shift();
-  addScar(.16+v*.24);
-  tone(n,v);
-  stateEl.textContent=organism.repeat>=4?'SURCHARGE':'PERTURBATION · '+source.toUpperCase();
+  if(organism.waves.length>10)organism.waves.shift();
+}
+
+function addMemoryScar(){
+  const index=Math.floor((organism.memory*97+organism.repeat*11)%seedDirections.length);
+  organism.scars.push({
+    direction:seedDirections[index].clone(),
+    amount:.018+organism.memory*.018,
+    width:.018+organism.memory*.028
+  });
+  if(organism.scars.length>24)organism.scars.shift();
+}
+
+function note(midi,velocity=.8,source='clavier'){
+  ensureAudio();
+  const now=performance.now()*.001;
+  const wasQuiet=now-organism.lastInteraction>60;
+
+  organism.lastInteraction=now;
+  organism.repeat=organism.lastNote===midi?Math.min(4,organism.repeat+1):1;
+  organism.lastNote=midi;
+  organism.energy=Math.min(1.25,organism.energy+velocity*.32);
+  organism.tension=Math.min(1.2,organism.tension+velocity*.19);
+  organism.memory=Math.min(1,organism.memory+.018);
+
+  if(wasQuiet)addMemoryScar();
+  addWave(midi,velocity);
+  addMemoryScar();
+  playNote(midi,velocity);
+
+  if(organism.repeat===4){
+    organism.overload=Math.min(1.25,organism.overload+.72);
+    organism.tension=Math.min(1.2,organism.tension+.34);
+  }
+
+  if(organism.repeat>=4)stateEl.textContent='SURCHARGE';
+  else if(organism.repeat===3)stateEl.textContent='ACCUMULATION';
+  else if(organism.repeat===2)stateEl.textContent='RÉSONANCE';
+  else stateEl.textContent=source==='MIDI'?'EXCITATION · MIDI':'EXCITATION';
+
+  rebuildBody();
 }
 
 const keys={a:60,z:62,e:64,r:65,t:67,y:69,u:71,q:72,s:74,d:76,f:77,g:79,h:81,j:83};
 const held=new Set();
 
-addEventListener('keydown',e=>{
-  if(e.repeat)return;
-  if(e.code==='Space'){
-    e.preventDefault();
+addEventListener('keydown',event=>{
+  if(event.repeat)return;
+  if(event.code==='Space'){
+    event.preventDefault();
     organism.arpeggiator=!organism.arpeggiator;
     ensureAudio();
     return;
   }
-  const n=keys[e.key.toLowerCase()];
-  if(n==null)return;
-  held.add(e.key.toLowerCase());
-  note(n,.9);
+  const midi=keys[event.key.toLowerCase()];
+  if(midi==null)return;
+  held.add(event.key.toLowerCase());
+  note(midi,.9);
 });
-addEventListener('keyup',e=>held.delete(e.key.toLowerCase()));
+addEventListener('keyup',event=>held.delete(event.key.toLowerCase()));
 addEventListener('blur',()=>held.clear());
 
 if(navigator.requestMIDIAccess){
-  navigator.requestMIDIAccess().then(a=>{
-    for(const input of a.inputs.values()){
-      input.onmidimessage=e=>{
-        const [s,n,v]=e.data,c=s&0xf0;
-        if(c===0x90&&v>0)note(n,v/127,'MIDI');
+  navigator.requestMIDIAccess().then(access=>{
+    for(const input of access.inputs.values()){
+      input.onmidimessage=event=>{
+        const [status,midi,velocity]=event.data;
+        if((status&0xf0)===0x90&&velocity>0)note(midi,velocity/127,'MIDI');
       };
     }
   }).catch(()=>{});
 }
 
-const arp=[60,64,67,72];
+const arp=[60,64,67,71];
 const clock=new THREE.Clock();
 let elapsed=0;
-const tmp=new THREE.Vector3();
+let lastFieldUpdate=0;
 
 function updateChord(){
-  const notes=[...held].map(k=>keys[k]).filter(Boolean);
+  const notes=[...held].map(key=>keys[key]).filter(Boolean);
   if(notes.length<2)return;
   const spread=Math.max(...notes)-Math.min(...notes);
-  const sum=notes.reduce((a,n)=>a+n,0);
-  const gain=.005+organism.tension*.009;
-  organism.targetOrientation.x+=Math.sin(sum*.07)*gain;
-  organism.targetOrientation.y+=Math.cos(spread*.31)*gain*1.2;
-  organism.targetOrientation.z+=Math.sin(spread*.19)*gain;
-  organism.targetOrientation.clampLength(0,.42);
+  const sum=notes.reduce((total,midi)=>total+midi,0);
+  const amount=.0025+organism.tension*.004;
+  organism.targetOrientation.x+=Math.sin(sum*.071)*amount;
+  organism.targetOrientation.y+=Math.cos(spread*.29)*amount;
+  organism.targetOrientation.z+=Math.sin(spread*.17)*amount;
+  organism.targetOrientation.clampLength(0,.32);
 }
-setInterval(updateChord,45);
-
-function updateField(){
-  slime.reset();
-
-  const breath=Math.sin(organism.breathPhase)*.5+.5;
-  const stress=Math.min(1,organism.tension*.6+organism.overload*.9);
-  const activity=Math.min(1.4,organism.energy+organism.tension*.65);
-  const overload=Math.min(1,organism.overload);
-
-  for(let i=0;i<fieldBalls.length;i++){
-    const b=fieldBalls[i];
-    const p=b.p.clone();
-    const phase=elapsed*(.12+i*.025);
-    p.x+=Math.sin(phase+i*2.1)*(.035+stress*.055);
-    p.y+=Math.cos(phase*.83+i)*(.025+breath*.035);
-    p.z+=Math.sin(phase*.71+i*.7)*(.03+activity*.04);
-    b.p.lerp(p,1);
-    const strength=b.s*(1+breath*.035+activity*.06-overload*.08);
-    slime.addBall(b.p.x,b.p.y,b.p.z,strength,12);
-  }
-
-  const micro=.035+organism.memory*.045+stress*.045;
-  const noiseDirections=[
-    new THREE.Vector3(1,.2,.4).normalize(),
-    new THREE.Vector3(-.3,1,.15).normalize(),
-    new THREE.Vector3(.2,-.25,1).normalize(),
-    new THREE.Vector3(-.7,.35,-.5).normalize()
-  ];
-
-  for(const impulse of organism.impulses){
-    impulse.age+=.016;
-    impulse.s*=Math.exp(-.9*.016);
-    tmp.copy(impulse.d);
-    const travel=Math.min(1.55,impulse.age*(.72+organism.tension*.7));
-    const pulse=.5+.5*Math.sin(impulse.age*8.5);
-    tmp.multiplyScalar(travel*.72);
-    const strength=Math.max(.05,impulse.s)*(.28+pulse*.18);
-    slime.addBall(tmp.x,tmp.y,tmp.z,strength,18);
-    slime.addBall(-tmp.x*.35,-tmp.y*.35,-tmp.z*.35,strength*.35,18);
-  }
-
-  for(const w of organism.waves){
-    w.age+=.016;
-    w.r+=.016*(.9+w.s);
-    w.s*=Math.exp(-.45*.016);
-    const axis=w.axis;
-    const ring=w.r*.65;
-    const phase=elapsed*1.7+w.age*2.4;
-    const x=Math.cos(phase)*ring*axis.z+Math.sin(phase)*ring*.45;
-    const y=Math.sin(phase*.83)*ring*.55;
-    const z=Math.sin(phase)*ring*axis.x;
-    slime.addBall(x,y,z,w.s*.22,20);
-    slime.addBall(-x*.7,-y*.45,-z*.7,w.s*.13,20);
-  }
-
-  for(const scar of scarAnchors){
-    scar.life*=Math.exp(-.004);
-    const persistent=.05+organism.memory*.16;
-    const amount=(scar.strength*.11+persistent)*scar.life;
-    const d=scar.dir;
-    slime.addBall(d.x*(1.05+amount*2.5),d.y*(1.05+amount*2.5),d.z*(1.05+amount*2.5),amount,17);
-  }
-
-  for(let i=0;i<noiseDirections.length;i++){
-    const d=noiseDirections[i];
-    const phase=elapsed*(.15+i*.06)+organism.memory*8+i;
-    const amount=micro*(.45+.55*Math.sin(phase));
-    slime.addBall(d.x*.82,d.y*.82,d.z*.82,amount,22);
-  }
-
-  if(organism.awakening>0){
-    const wakeDir=new THREE.Vector3(Math.sin(organism.memory*17),.55,Math.cos(organism.tension*9)).normalize();
-    const a=organism.awakening;
-    slime.addBall(wakeDir.x*(.95+a*.35),wakeDir.y*(.95+a*.35),wakeDir.z*(.95+a*.35),.32*a,15);
-    organism.awakening=Math.max(0,organism.awakening-.016);
-  }
-
-  if(overload>.15){
-    const count=4+Math.floor(overload*8);
-    for(let i=0;i<count;i++){
-      const a=elapsed*(1.4+i*.31)+i*2.2;
-      const d=new THREE.Vector3(Math.cos(a),Math.sin(a*.73),Math.sin(a)).normalize();
-      const r=.9+Math.sin(a*1.7)*.2;
-      const spike=Math.max(0,overload-.15)*.12;
-      slime.addBall(d.x*r,d.y*r,d.z*r,spike,10);
-    }
-  }
-
-  slime.update();
-}
+setInterval(updateChord,70);
 
 function update(dt){
   elapsed+=dt;
-  const now=performance.now()/1000;
-  const silent=now-organism.lastInteraction;
+  organism.breathPhase=(organism.breathPhase+dt*(organism.bpm/60)*Math.PI)%(Math.PI*2);
+  organism.energy=Math.max(0,organism.energy-dt*.045);
+  organism.tension=Math.max(0,organism.tension-dt*.025);
+  organism.overload=Math.max(0,organism.overload-dt*.38);
 
-  organism.breathPhase=(organism.breathPhase+dt*(organism.bpm/60/2)*Math.PI*2)%(Math.PI*2);
-  organism.energy=Math.max(0,organism.energy-dt*.055);
-  organism.tension=Math.max(0,organism.tension-dt*.032);
-  organism.memory=Math.max(0,organism.memory-dt*.000002);
-  organism.overload=Math.max(0,organism.overload-dt*.72);
-  organism.cohesion=Math.min(1,organism.cohesion+dt*.025);
+  for(const wave of organism.waves)wave.age+=dt;
+  organism.waves=organism.waves.filter(wave=>wave.age<2.4);
+
+  organism.orientation.lerp(organism.targetOrientation,1-Math.exp(-dt*.9));
+  body.rotation.set(organism.orientation.x,organism.orientation.y,organism.orientation.z);
 
   const breath=Math.sin(organism.breathPhase)*.5+.5;
-  const activity=Math.min(1.3,organism.energy+organism.tension*.7);
-  const overload=Math.min(1,organism.overload);
-  const breathe=1+breath*.022+activity*.018-overload*.025;
-  slime.scale.lerp(new THREE.Vector3(2.05*breathe,2.02*breathe,2.05*breathe),1-Math.exp(-dt*2.8));
+  const scale=1+breath*.014+organism.energy*.012-organism.overload*.018;
+  const targetScale=new THREE.Vector3(2.12*scale,2.12*scale,2.12*scale);
+  body.scale.lerp(targetScale,1-Math.exp(-dt*2.4));
 
-  organism.orientation.lerp(organism.targetOrientation,1-Math.exp(-dt*1.15));
-  slime.rotation.set(organism.orientation.x,organism.orientation.y,organism.orientation.z);
+  if(elapsed-lastFieldUpdate>.075){
+    rebuildBody();
+    lastFieldUpdate=elapsed;
+  }
 
-  updateField();
-
-  energyEl.style.width=Math.min(100,organism.energy/1.4*100)+'%';
-  tensionEl.style.width=Math.min(100,organism.tension/1.4*100)+'%';
+  energyEl.style.width=Math.min(100,organism.energy/1.1*100)+'%';
+  tensionEl.style.width=Math.min(100,organism.tension/1.1*100)+'%';
   memoryEl.style.width=Math.min(100,organism.memory*100)+'%';
+  overloadEl.style.width=Math.min(100,organism.overload/1.1*100)+'%';
   breathEl.textContent=Math.round(organism.bpm)+' BPM';
   repeatEl.textContent=organism.repeat+' / 4';
-  overloadEl.style.width=Math.min(100,organism.overload/1.2*100)+'%';
   arpEl.textContent=organism.arpeggiator?'ON':'OFF';
 
-  if(organism.overload>.35)stateEl.textContent='SURCHARGE';
+  const silent=performance.now()*.001-organism.lastInteraction;
+  if(organism.overload>.25)stateEl.textContent='SURCHARGE';
   else if(silent>60)stateEl.textContent='CALME · MÉMOIRE CONSERVÉE';
-  else if(organism.tension>.22)stateEl.textContent='RÉSONANCE';
-  else if(organism.energy>.16)stateEl.textContent='EXCITATION';
-  else stateEl.textContent='RESPIRATION · '+organism.bpm+' BPM';
+  else if(organism.tension>.17)stateEl.textContent='RÉSONANCE';
+  else if(organism.energy>.10)stateEl.textContent='EXCITATION';
+  else stateEl.textContent='RESPIRATION · 72 BPM';
 }
 
-function resize(){
+addEventListener('resize',()=>{
   camera.aspect=innerWidth/innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight);
-}
-addEventListener('resize',resize);
+});
+
+rebuildBody();
 
 renderer.setAnimationLoop(()=>{
   const dt=Math.min(clock.getDelta(),.033);
+
   if(organism.arpeggiator){
     organism.arpTimer+=dt;
     const step=(60/organism.bpm)/2;
     if(organism.arpTimer>=step){
       organism.arpTimer-=step;
-      note(arp[organism.arpIndex++%arp.length],.42,'ARPÈGE');
+      note(arp[organism.arpIndex++%arp.length],.36,'ARPÈGE');
     }
   }
+
   update(dt);
-  key.position.x=Math.sin(elapsed*.18)*3.2;
-  key.position.z=3.6+Math.cos(elapsed*.13)*1.2;
+  key.position.x=Math.sin(elapsed*.15)*3.2;
+  key.position.z=3.8+Math.cos(elapsed*.11)*1.1;
   renderer.render(scene,camera);
 });
