@@ -2,26 +2,36 @@
 
 Prototype audiovisuel interactif : un organisme ferrofluidique qui respire, absorbe les perturbations musicales, accumule des traces et conserve une mémoire morphologique.
 
-## Prototype actuel
+## État du prototype
 
-- Corps généré comme un volume organique par champ implicite / Marching Cubes, plutôt qu'une sphère déformée.
+- Un seul volume continu : aucune note ne crée de sphère, de bulle ou d'objet secondaire.
+- La forme est un champ implicite Marching Cubes, avec une base asymétrique et un grain fin de surface.
+- Une note injecte une onde de déformation qui circule sur le volume existant.
+- La même note répétée suit quatre régimes : excitation, résonance, accumulation, surcharge.
+- La surcharge modifie qualitativement la morphologie : pointes plus magnétiques, cohésion légèrement réduite, mais sans séparation en objets.
+- La mémoire est inscrite directement dans la géométrie sous forme de déformations persistantes.
+- Les accords agissent sur l'orientation et la torsion du même corps.
+- Le corps respire continuellement à 72 BPM et ne disparaît jamais.
+- Après environ 60 secondes de silence, la reprise crée une trace d'éveil ; la mémoire précédente reste présente.
 - Clavier AZERTY : A, Z, E, R, T, Y, U, Q, S, D, F, G, H, J.
-- MIDI : entrée instrumentale.
-- Espace : active/désactive l'arpégiateur interne.
+- MIDI : notes MIDI Note On.
+- Espace : active/désactive l'arpégiateur.
 - Aucune interaction souris ou tactile.
-- Respiration autonome à 72 BPM.
-- Une note crée une excitation qui se propage dans le volume.
-- La répétition d'une même note fait évoluer le régime : excitation, résonance, accumulation, surcharge.
-- Les accords modifient l'orientation et la torsion du même corps.
-- La mémoire reste inscrite dans la morphologie pendant toute la session.
-- Après environ 60 secondes de silence, la reprise crée une trace d'éveil / interruption.
 
-## Intention
+## Architecture
 
-Le corps n'illustre pas la musique. Il possède sa propre dynamique.
+Le projet reste volontairement léger : Three.js est chargé par import map depuis CDN, sans build step.
 
-La musique le perturbe ; il absorbe, transforme, mémorise puis récupère. La forme devient progressivement l'archive visible de l'interaction.
+La géométrie n'utilise plus addBall pour représenter les notes. Cette API produit des volumes de type metaball ; elle est donc écartée pour les événements utilisateur. Le corps est défini par un champ scalaire continu avec setCell, puis polygonisé par Marching Cubes.
 
-## Développement
+La priorité de cette passe est la stabilité comportementale : une note déforme le corps existant au lieu de générer un nouvel objet, les perturbations expirent progressivement, et la mémoire reste sous forme de biais morphologiques.
 
-Le prototype reste sans build step : Three.js et son addon Marching Cubes sont chargés depuis un CDN. La prochaine étape de recherche concerne surtout la qualité de la simulation de matière : circulation interne, pointes ferrofluidiques, mémoire morphologique et comportement de surcharge.
+## Développement local
+
+Servir le dossier avec un serveur HTTP local, par exemple :
+
+    python3 -m http.server 8000
+
+Puis ouvrir http://localhost:8000.
+
+Un serveur HTTP est préférable à l'ouverture directe du fichier HTML pour les modules ES et l'import map.
