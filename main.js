@@ -61,7 +61,7 @@ function playNote(n,v=.8){
 
 // A dense, irregular magnetic lattice. The peaks are part of one continuous
 // surface; notes modify their height, never create new objects.
-const COUNT=72;
+const COUNT=96;
 const directions=[];
 const baseHeight=new Float32Array(COUNT);
 const peakHeight=new Float32Array(COUNT);
@@ -90,8 +90,8 @@ uniform float uTension;
 uniform float uMemory;
 uniform float uOverload;
 uniform float uBreath;
-uniform vec3 uDirections[72];
-uniform float uPeakHeight[72];
+uniform vec3 uDirections[96];
+uniform float uPeakHeight[96];
 uniform vec3 uImpulseDirection[4];
 uniform float uImpulseTime[4];
 uniform float uImpulseAmp[4];
@@ -108,7 +108,7 @@ float angularPeak(vec3 n, vec3 d, float width){
 float surfaceHeight(vec3 n){
   float h=0.0;
   float broad=0.0;
-  for(int i=0;i<72;i++){
+  for(int i=0;i<96;i++){
     float p=angularPeak(n,uDirections[i],0.020);
     h+=p*uPeakHeight[i];
     broad+=angularPeak(n,uDirections[i],0.075)*uPeakHeight[i]*0.18;
@@ -117,15 +117,16 @@ float surfaceHeight(vec3 n){
   // Dense magnetic field: a continuous low relief connects neighbouring peaks.
   h+=broad;
 
-  // Travelling perturbations cross the existing lattice.
+  // A note raises a compact magnetic peak. No travelling ring: the
+  // disturbance is a local spike that relaxes into the surrounding surface.
   for(int i=0;i<4;i++){
     float age=uTime-uImpulseTime[i];
-    if(age>=0.0 && age<2.4){
-      float front=1.0-age*.78;
-      float q=dot(n,uImpulseDirection[i]);
-      float ring=exp(-pow((q-front)/.065,2.0));
-      float wake=exp(-pow((q-(front+.12))/.15,2.0));
-      h+=(ring-wake*.42)*uImpulseAmp[i];
+    if(age>=0.0 && age<1.8){
+      float q=max(dot(n,uImpulseDirection[i]),0.0);
+      float local=exp((q-1.0)/.018);
+      float halo=exp((q-1.0)/.075);
+      float pulse=exp(-age*2.8);
+      h+=(local*.075 + halo*.018)*uImpulseAmp[i]*pulse;
     }
   }
 
@@ -154,13 +155,13 @@ void main(){
   vec3 p=n*radius;
 
   // Slightly oblate, weighted mass rather than a geometric ball.
-  p.x*=1.22;
-  p.y*=.86;
-  p.z*=.72;
+  p.x*=1.06;
+  p.y*=.97;
+  p.z*=.88;
 
-  // A subtle lower flattening gives the mass a projected installation presence.
-  float lower=smoothstep(-.82,-.18,n.y);
-  p.y+=lower*.055;
+  // Keep the mass compact and soft, with only a very slight weighted base.
+  float lower=smoothstep(-.9,-.35,n.y);
+  p.y+=lower*.018;
 
   vec4 world=modelMatrix*vec4(p,1.0);
   vWorld=world.xyz;
@@ -225,7 +226,7 @@ const uniforms={
 const material=new THREE.ShaderMaterial({uniforms,vertexShader,fragmentShader,side:THREE.FrontSide});
 const geometry=new THREE.SphereGeometry(1,128,80);
 const body=new THREE.Mesh(geometry,material);
-body.scale.set(2.12,1.82,1.52);
+body.scale.set(2.02,1.96,1.82);
 scene.add(body);
 
 let impulseIndex=0;
@@ -235,7 +236,7 @@ function addImpulse(midi,velocity){
   const y=Math.sin(midi*.071+organism.tension*2.0)*.48;
   impulseDir[i].set(Math.cos(a),y,Math.sin(a)).normalize();
   impulseTime[i]=clock.elapsedTime;
-  impulseAmp[i]=.055+velocity*.085+organism.tension*.025;
+  impulseAmp[i]=.8+velocity*.55+organism.tension*.25;
 }
 
 function stimulatePeaks(midi,velocity){
@@ -247,7 +248,7 @@ function stimulatePeaks(midi,velocity){
   for(let i=0;i<COUNT;i++){
     const d=directions[i].dot(target);
     const influence=Math.exp((Math.max(d,-1)-1.0)/.11);
-    peakArray[i]=Math.min(.34,peakArray[i]+influence*(.035+velocity*.045));
+    peakArray[i]=Math.min(.30,peakArray[i]+influence*(.045+velocity*.060));
   }
 }
 
@@ -349,7 +350,7 @@ function update(dt){
 
   const breath=Math.sin(organism.breathPhase)*.5+.5;
   const s=1+breath*.009+organism.energy*.008-organism.overload*.012;
-  body.scale.lerp(new THREE.Vector3(2.12*s,1.82*s,1.52*s),1-Math.exp(-dt*2));
+  body.scale.lerp(new THREE.Vector3(2.02*s,1.96*s,1.82*s),1-Math.exp(-dt*2));
 
   energyEl.style.width=Math.min(100,organism.energy*100)+'%';
   tensionEl.style.width=Math.min(100,organism.tension*100)+'%';
