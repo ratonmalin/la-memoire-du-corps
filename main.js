@@ -11,14 +11,14 @@ const overloadEl=document.querySelector('#overload');
 const arpEl=document.querySelector('#arp');
 
 const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setPixelRatio(Math.min(devicePixelRatio,2.5));
 renderer.setSize(innerWidth,innerHeight);
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure=1.18;
+renderer.toneMappingExposure=.92;
 
 const scene=new THREE.Scene();
-scene.background=new THREE.Color(0xe9e8e3);
+scene.background=new THREE.Color(0xc9c8c3);
 
 const camera=new THREE.PerspectiveCamera(30,innerWidth/innerHeight,.1,100);
 camera.position.set(0,0,8);
@@ -202,13 +202,13 @@ void main(){
   float side=1.0-abs(N.x)*.35;
 
   vec3 graphite=vec3(.0065,.0075,.0085);
-  vec3 reflection=vec3(.54,.59,.64)*fresnel*.9;
+  vec3 reflection=vec3(.38,.42,.46)*fresnel*.72;
   reflection+=vec3(.12,.15,.18)*top;
-  vec3 highlight=vec3(.98,.99,1.0)*spec1*2.3;
-  highlight+=vec3(.70,.82,1.0)*spec2*1.35;
+  vec3 highlight=vec3(.92,.94,.96)*spec1*.95;
+  highlight+=vec3(.66,.74,.82)*spec2*.62;
 
   // Fine reflected structure follows the relief, not a painted texture.
-  float glint=pow(max(0.0,sin(vHeight*95.0+uTime*.7)),18.0)*.10;
+  float glint=pow(max(0.0,sin(vHeight*70.0+uTime*.7)),22.0)*.035;
   vec3 body=graphite*(.28+.72*side)+reflection+highlight+vec3(glint);
 
   float stress=smoothstep(.12,.8,uTension+uOverload);
@@ -225,10 +225,10 @@ const uniforms={
   uImpulseDirection:{value:impulseDir},uImpulseTime:{value:impulseTime},uImpulseAmp:{value:impulseAmp}
 };
 
-const material=new THREE.ShaderMaterial({uniforms,vertexShader,fragmentShader,side:THREE.FrontSide});
-const geometry=new THREE.SphereGeometry(1,256,160);
+const material=new THREE.ShaderMaterial({uniforms,vertexShader,fragmentShader,side:THREE.FrontSide,flatShading:false});
+const geometry=new THREE.SphereGeometry(1,384,256);
 const body=new THREE.Mesh(geometry,material);
-body.scale.set(1.28,1.25,1.18);
+body.scale.set(1.12,1.10,1.04);
 scene.add(body);
 
 let impulseIndex=0;
@@ -332,7 +332,7 @@ function updateChord(){
 }
 setInterval(updateChord,80);
 
-function update(dt){
+function fitCamera(){\n  const maxBodyScale=Math.max(body.scale.x,body.scale.y,body.scale.z);\n  const maxRadius=1.12*maxBodyScale*(.73+.34+organism.overload*.08);\n  const fovRad=THREE.MathUtils.degToRad(camera.fov);\n  const aspect=Math.max(camera.aspect,.1);\n  const verticalFit=maxRadius/Math.tan(fovRad*.5);\n  const horizontalFit=maxRadius/Math.tan(Math.atan(Math.tan(fovRad*.5)*aspect));\n  const distance=Math.max(verticalFit,horizontalFit)*1.28;\n  camera.position.z=THREE.MathUtils.lerp(camera.position.z,distance,0.12);\n}\n\nfunction update(dt){
   uniforms.uTime.value=clock.elapsedTime;
 
   organism.breathPhase=(organism.breathPhase+dt*(organism.bpm/60)*Math.PI)%(Math.PI*2);
@@ -359,7 +359,7 @@ function update(dt){
 
   const breath=Math.sin(organism.breathPhase)*.5+.5;
   const s=1+breath*.003+organism.energy*.008-organism.overload*.012;
-  body.scale.lerp(new THREE.Vector3(1.28*s,1.25*s,1.18*s),1-Math.exp(-dt*2));
+  body.scale.lerp(new THREE.Vector3(1.12*s,1.10*s,1.04*s),1-Math.exp(-dt*2));
 
   energyEl.style.width=Math.min(100,organism.energy*100)+'%';
   tensionEl.style.width=Math.min(100,organism.tension*100)+'%';
@@ -396,5 +396,5 @@ renderer.setAnimationLoop(()=>{
   }
 
   update(dt);
-  renderer.render(scene,camera);
+  fitCamera();\n  renderer.render(scene,camera);
 });
