@@ -18,7 +18,7 @@ renderer.toneMapping=THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure=.92;
 
 const scene=new THREE.Scene();
-scene.background=new THREE.Color(0xc9c8c3);
+scene.background=new THREE.Color(0xb9b8b3);
 
 const camera=new THREE.PerspectiveCamera(30,innerWidth/innerHeight,.1,100);
 camera.position.set(0,0,8);
@@ -173,10 +173,10 @@ void main(){
   float s1=pow(max(dot(N,H1),0.0),55.0);
   float s2=pow(max(dot(N,H2),0.0),80.0);
 
-  vec3 graphite=vec3(0.012,0.014,0.016);
-  vec3 reflection=vec3(0.24,0.28,0.31)*fresnel;
-  vec3 highlight=vec3(0.72,0.76,0.80)*s1*0.58;
-  highlight+=vec3(0.48,0.54,0.60)*s2*0.36;
+  vec3 graphite=vec3(0.030,0.034,0.038);
+  vec3 reflection=vec3(0.30,0.34,0.38)*fresnel;
+  float diffuse=0.5+0.5*max(dot(N,L1),0.0);\n  vec3 highlight=vec3(0.62,0.66,0.70)*s1*0.42;\n  highlight+=vec3(0.16,0.18,0.20)*diffuse;
+  highlight+=vec3(0.40,0.46,0.52)*s2*0.22;
 
   float stress=smoothstep(0.10,0.75,uTension+uOverload);
   vec3 body=graphite+reflection+highlight;
@@ -193,7 +193,7 @@ const uniforms={
 };
 
 const material=new THREE.ShaderMaterial({uniforms,vertexShader,fragmentShader,side:THREE.FrontSide,flatShading:false});
-const geometry=new THREE.SphereGeometry(1,256,160);
+const geometry=new THREE.SphereGeometry(1,384,256);
 const body=new THREE.Mesh(geometry,material);
 body.scale.set(1.12,1.10,1.04);
 scene.add(body);
@@ -205,7 +205,9 @@ function addImpulse(midi,velocity){
   const y=Math.sin(midi*.071+organism.tension*2.0)*.48;
   impulseDir[i].set(Math.cos(a),y,Math.sin(a)).normalize();
   impulseTime[i]=clock.elapsedTime;
-  impulseAmp[i]=.8+velocity*.55+organism.tension*.25;\n  uniforms.uNoteDir.value.copy(impulseDir[i]);\n  uniforms.uNotePulse.value=impulseAmp[i];
+  impulseAmp[i]=.8+velocity*.55+organism.tension*.25;
+  uniforms.uNoteDir.value.copy(impulseDir[i]);
+  uniforms.uNotePulse.value=impulseAmp[i];
 }
 
 function stimulatePeaks(midi,velocity){
@@ -329,7 +331,8 @@ function update(dt){
   uniforms.uOverload.value=organism.overload;
   uniforms.uBreath.value=organism.breathPhase;
   organism.chordPulse=Math.max(0,organism.chordPulse-dt*.035);
-  uniforms.uChord.value=organism.chordPulse;\n  uniforms.uNotePulse.value=Math.max(0,uniforms.uNotePulse.value-dt*2.8);
+  uniforms.uChord.value=organism.chordPulse;
+  uniforms.uNotePulse.value=Math.max(0,uniforms.uNotePulse.value-dt*2.8);
 
   organism.orientation.lerp(organism.targetOrientation,1-Math.exp(-dt*.9));
   organism.targetOrientation.multiplyScalar(Math.exp(-dt*.055));
