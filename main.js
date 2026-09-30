@@ -95,6 +95,69 @@ const impulseAmp=new Float32Array(4);
 // Robust render path: standard Three.js material handles lighting.
 // The custom deformation is injected only into the vertex stage, so a shader
 // compile problem cannot blank the entire object.
+const uniforms={
+  uTime:{value:0},uEnergy:{value:0},uTension:{value:0},uMemory:{value:0},
+  uOverload:{value:0},uBreath:{value:0},uChord:{value:0},
+  uNoteDir:{value:new THREE.Vector3(0,1,0)},uNotePulse:{value:0}
+};
+
+const geometry=new THREE.SphereGeometry(1,384,256);
+const material=new THREE.MeshPhysicalMaterial({
+  color:0x12161a,
+  metalness:.86,
+  roughness:.22,
+  clearcoat:.28,
+  clearcoatRoughness:.12,
+  envMapIntensity:1.15
+});
+
+material.onBeforeCompile=(shader)=>{
+  Object.assign(shader.uniforms,uniforms);
+  shader.vertexShader=shader.vertexShader
+    .replace('#include <common>',`#include <common>
+uniform float uTime;
+uniform float uEnergy;
+uniform float uTension;
+uniform float uMemory;
+uniform float uOverload;
+uniform float uBreath;
+uniform float uChord;
+uniform vec3 uNoteDir;
+uniform float uNotePulse;
+
+float surfaceHeight(vec3 n){
+  float h=0.0;
+  h+=pow(max(dot(n,normalize(vec3(.72,.34,.61))),0.0),22.0)*.060;
+  h+=pow(max(dot(n,normalize(vec3(-.58,.52,.62))),0.0),28.0)*.052;
+  h+=pow(max(dot(n,normalize(vec3(.12,-.82,.56))),0.0),24.0)*.046;
+  h+=pow(max(dot(n,normalize(vec3(-.62,-.28,-.72))),0.0),30.0)*.040;
+  float organic=sin(n.x*4.7+n.y*2.1)+sin(n.z*5.3-n.x*1.7)+sin(n.y*6.1+n.z*2.4);
+  h+=organic*.008;
+  float q=max(dot(n,uNoteDir),0.0);
+  h+=(pow(q,30.0)*.105+pow(q,8.0)*.020)*uNotePulse;
+  h+=uMemory*.012*(.5+.5*sin(n.x*3.0+n.z*4.0));
+  return h;
+}`)
+    .replace('#include <begin_vertex>',`#include <begin_vertex>
+vec3 n=normalize(objectNormal);
+float h=surfaceHeight(n);
+float breath=sin(uBreath)*.5+.5;
+float radius=.76+h+breath*.003+uEnergy*.010-uOverload*.018;
+transformed=n*radius;
+transformed.x*=1.025;
+transformed.y*=.995;
+transformed.z*=.975;
+float twist=uChord*.045*(n.y+.2);
+float cs=cos(twist),sn=sin(twist);
+transformed.xz=mat2(cs,-sn,sn,cs)*transformed.xz;`);
+  shader.userData=uniforms;
+};
+material.customProgramCacheKey=()=> 'memoire-corps-v14';
+
+const body=new THREE.Mesh(geometry,material);
+body.scale.set(1.12,1.10,1.04);
+scene.add(body);
+
 let impulseIndex=0;
 function addImpulse(midi,velocity){
   const i=impulseIndex++%4;
