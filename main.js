@@ -177,10 +177,10 @@ function fieldAt(x,y,z){
   }
 
   if(organism.overload>.05){
-    for(let i=0;i<7;i++){
+    for(let i=0;i<4;i++){
       const direction=seedDirections[(i+Math.floor(organism.memory*30))%seedDirections.length];
       const lobe=angularLobe(nx,ny,nz,direction,.018);
-      radius+=lobe*organism.overload*(.045+.018*Math.sin(i*2.7+performance.now()*.001));
+      radius+=lobe*organism.overload*(.028+.010*Math.sin(i*2.7+elapsed*.9));
     }
   }
 
@@ -210,21 +210,21 @@ function addWave(midi,velocity){
 
   organism.waves.push({
     direction,
-    amount:.052+velocity*.075+organism.tension*.018,
+    amount:.038+velocity*.050+organism.tension*.012,
     age:0,
-    speed:.78+organism.tension*.34
+    speed:.66+organism.tension*.24
   });
-  if(organism.waves.length>10)organism.waves.shift();
+  if(organism.waves.length>6)organism.waves.shift();
 }
 
 function addMemoryScar(){
   const index=Math.floor((organism.memory*97+organism.repeat*11)%seedDirections.length);
   organism.scars.push({
     direction:seedDirections[index].clone(),
-    amount:.018+organism.memory*.018,
-    width:.018+organism.memory*.028
+    amount:.012+organism.memory*.014,
+    width:.022+organism.memory*.024
   });
-  if(organism.scars.length>24)organism.scars.shift();
+  if(organism.scars.length>18)organism.scars.shift();
 }
 
 function note(midi,velocity=.8,source='clavier'){
@@ -241,7 +241,7 @@ function note(midi,velocity=.8,source='clavier'){
 
   if(wasQuiet)addMemoryScar();
   addWave(midi,velocity);
-  addMemoryScar();
+  if(!wasQuiet)addMemoryScar();
   playNote(midi,velocity);
 
   if(organism.repeat===4){
@@ -254,7 +254,6 @@ function note(midi,velocity=.8,source='clavier'){
   else if(organism.repeat===2)stateEl.textContent='RÉSONANCE';
   else stateEl.textContent=source==='MIDI'?'EXCITATION · MIDI':'EXCITATION';
 
-  rebuildBody();
 }
 
 const keys={a:60,z:62,e:64,r:65,t:67,y:69,u:71,q:72,s:74,d:76,f:77,g:79,h:81,j:83};
@@ -313,7 +312,7 @@ function update(dt){
   organism.overload=Math.max(0,organism.overload-dt*.38);
 
   for(const wave of organism.waves)wave.age+=dt;
-  organism.waves=organism.waves.filter(wave=>wave.age<2.4);
+  organism.waves=organism.waves.filter(wave=>wave.age<1.9);
 
   organism.orientation.lerp(organism.targetOrientation,1-Math.exp(-dt*.9));
   body.rotation.set(organism.orientation.x,organism.orientation.y,organism.orientation.z);
