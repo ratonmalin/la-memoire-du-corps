@@ -26,8 +26,8 @@ camera.lookAt(0,0,0);
 
 const organism={
   energy:.015,tension:.012,memory:0,overload:0,
-  breathPhase:0,bpm:72,lastInteraction:-Infinity,lastNote:null,repeat:0,
-  arpeggiator:false,arpIndex:0,arpTimer:0,
+  breathPhase:0,bpm:36,lastInteraction:-Infinity,lastNote:null,repeat:0,
+  arpeggiator:false,arpIndex:0,arpTimer:0,chordPulse:0,
   orientation:new THREE.Vector3(),targetOrientation:new THREE.Vector3()
 };
 
@@ -90,6 +90,7 @@ uniform float uTension;
 uniform float uMemory;
 uniform float uOverload;
 uniform float uBreath;
+uniform float uChord;
 uniform vec3 uDirections[96];
 uniform float uPeakHeight[96];
 uniform vec3 uImpulseDirection[4];
@@ -144,8 +145,9 @@ void main(){
   // while the body remains physically continuous.
   float breath=sin(uBreath)*.5+.5;
   float radius=.73+h;
-  radius+=breath*.012;
+  radius+=breath*.004;
   radius+=uEnergy*.012;
+  radius+=sin(n.y*3.1415)*uChord*.010;
 
   // Overload changes the regime: peaks become sharper and the body contracts.
   float overloadPeak=surfaceHeight(n)-.10;
@@ -218,7 +220,7 @@ void main(){
 
 const uniforms={
   uTime:{value:0},uEnergy:{value:0},uTension:{value:0},uMemory:{value:0},
-  uOverload:{value:0},uBreath:{value:0},
+  uOverload:{value:0},uBreath:{value:0},uChord:{value:0},
   uDirections:{value:dirArray},uPeakHeight:{value:peakArray},
   uImpulseDirection:{value:impulseDir},uImpulseTime:{value:impulseTime},uImpulseAmp:{value:impulseAmp}
 };
@@ -226,7 +228,7 @@ const uniforms={
 const material=new THREE.ShaderMaterial({uniforms,vertexShader,fragmentShader,side:THREE.FrontSide});
 const geometry=new THREE.SphereGeometry(1,128,80);
 const body=new THREE.Mesh(geometry,material);
-body.scale.set(2.02,1.96,1.82);
+body.scale.set(1.62,1.58,1.46);
 scene.add(body);
 
 let impulseIndex=0;
@@ -248,7 +250,7 @@ function stimulatePeaks(midi,velocity){
   for(let i=0;i<COUNT;i++){
     const d=directions[i].dot(target);
     const influence=Math.exp((Math.max(d,-1)-1.0)/.11);
-    peakArray[i]=Math.min(.30,peakArray[i]+influence*(.045+velocity*.060));
+    peakArray[i]=Math.min(.28,peakArray[i]+influence*(.032+velocity*.042));
   }
 }
 
@@ -260,9 +262,9 @@ function note(midi,velocity=.8,source='clavier'){
 
   organism.repeat=organism.lastNote===midi?Math.min(4,organism.repeat+1):1;
   organism.lastNote=midi;
-  organism.energy=Math.min(1,organism.energy+velocity*.22);
-  organism.tension=Math.min(1,organism.tension+velocity*.13);
-  organism.memory=Math.min(1,organism.memory+.014);
+  organism.energy=Math.min(1,organism.energy+velocity*.16);
+  organism.tension=Math.min(1,organism.tension+velocity*.075);
+  organism.memory=Math.min(1,organism.memory+.010);
 
   stimulatePeaks(midi,velocity);
   addImpulse(midi,velocity);
@@ -318,11 +320,15 @@ function updateChord(){
   if(notes.length<2)return;
   const spread=Math.max(...notes)-Math.min(...notes);
   const sum=notes.reduce((a,n)=>a+n,0);
-  const gain=.002+organism.tension*.003;
+  const gain=.006+organism.tension*.004;
   organism.targetOrientation.x+=Math.sin(sum*.071)*gain;
   organism.targetOrientation.y+=Math.cos(spread*.29)*gain;
   organism.targetOrientation.z+=Math.sin(spread*.17)*gain;
-  organism.targetOrientation.clampLength(0,.22);
+  organism.targetOrientation.clampLength(0,.38);
+  organism.chordPulse=Math.min(1,organism.chordPulse+.08);
+  // Chords act on the whole mass: a slow torsional state, not local spikes.
+  organism.energy=Math.min(1,organism.energy+.006*notes.length);
+  organism.tension=Math.min(1,organism.tension+.004*notes.length);
 }
 setInterval(updateChord,80);
 
@@ -330,9 +336,9 @@ function update(dt){
   uniforms.uTime.value=clock.elapsedTime;
 
   organism.breathPhase=(organism.breathPhase+dt*(organism.bpm/60)*Math.PI)%(Math.PI*2);
-  organism.energy=Math.max(0,organism.energy-dt*.035);
-  organism.tension=Math.max(0,organism.tension-dt*.018);
-  organism.overload=Math.max(0,organism.overload-dt*.27);
+  organism.energy=Math.max(0,organism.energy-dt*.020);
+  organism.tension=Math.max(0,organism.tension-dt*.010);
+  organism.overload=Math.max(0,organism.overload-dt*.12);
 
   // Memory never decays. Morphology therefore remains changed after silence.
   for(let i=0;i<COUNT;i++){
@@ -344,28 +350,30 @@ function update(dt){
   uniforms.uMemory.value=organism.memory;
   uniforms.uOverload.value=organism.overload;
   uniforms.uBreath.value=organism.breathPhase;
+  organism.chordPulse=Math.max(0,organism.chordPulse-dt*.035);
+  uniforms.uChord.value=organism.chordPulse;
 
   organism.orientation.lerp(organism.targetOrientation,1-Math.exp(-dt*.65));
   body.rotation.set(organism.orientation.x,organism.orientation.y,organism.orientation.z);
 
   const breath=Math.sin(organism.breathPhase)*.5+.5;
-  const s=1+breath*.009+organism.energy*.008-organism.overload*.012;
-  body.scale.lerp(new THREE.Vector3(2.02*s,1.96*s,1.82*s),1-Math.exp(-dt*2));
+  const s=1+breath*.003+organism.energy*.008-organism.overload*.012;
+  body.scale.lerp(new THREE.Vector3(1.62*s,1.58*s,1.46*s),1-Math.exp(-dt*2));
 
   energyEl.style.width=Math.min(100,organism.energy*100)+'%';
   tensionEl.style.width=Math.min(100,organism.tension*100)+'%';
   memoryEl.style.width=organism.memory*100+'%';
   overloadEl.style.width=Math.min(100,organism.overload/1.05*100)+'%';
-  breathEl.textContent='72 BPM';
+  breathEl.textContent='36 BPM';
   repeatEl.textContent=organism.repeat+' / 4';
   arpEl.textContent=organism.arpeggiator?'ON':'OFF';
 
   const silent=performance.now()*.001-organism.lastInteraction;
   if(organism.overload>.25)stateEl.textContent='SURCHARGE';
   else if(silent>60)stateEl.textContent='CALME · MÉMOIRE CONSERVÉE';
-  else if(organism.tension>.14)stateEl.textContent='RÉSONANCE';
-  else if(organism.energy>.08)stateEl.textContent='EXCITATION';
-  else stateEl.textContent='RESPIRATION · 72 BPM';
+  else if(organism.tension>.10)stateEl.textContent='RÉSONANCE';
+  else if(organism.energy>.055)stateEl.textContent='EXCITATION';
+  else stateEl.textContent='RESPIRATION · 36 BPM';
 }
 
 addEventListener('resize',()=>{
