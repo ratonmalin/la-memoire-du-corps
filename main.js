@@ -210,7 +210,7 @@ void main(){
 
 const uniforms={
   uTime:{value:0},uEnergy:{value:0},uTension:{value:0},uMemory:{value:0},uOverload:{value:0},
-  uBreath:{value:0},uPeaks:{value:peakArray},uScars:{value:scarArray},uScarStrength:{value:scarStrength},
+  uBreath:{value:0},uPeaks:{value:peakArray},uScars:{value:scarDirections},uScarStrength:{value:scarStrength},
   uWaveStart:{value:new Float32Array(6).fill(-100)},uWaveAmount:{value:new Float32Array(6)},
   uWaveDirection:{value:Array.from({length:6},()=>new THREE.Vector3(0,1,0))},
   uLightA:{value:new THREE.Vector3(3.2,3.4,4.8)},uLightB:{value:new THREE.Vector3(-3.5,1.5,2.2)}
