@@ -183,7 +183,7 @@ varying vec3 vNormalObject;
 varying float vHeight;
 
 void main(){
-  vec3 N=normalize(cross(dFdx(vWorld),dFdy(vWorld)));
+  vec3 N=normalize(normalMatrix*vNormalObject);
   vec3 V=normalize(cameraPosition-vWorld);
 
   float ndv=max(dot(N,V),0.0);
@@ -226,7 +226,7 @@ const uniforms={
 };
 
 const material=new THREE.ShaderMaterial({uniforms,vertexShader,fragmentShader,side:THREE.FrontSide,flatShading:false});
-const geometry=new THREE.SphereGeometry(1,384,256);
+const geometry=new THREE.SphereGeometry(1,256,160);
 const body=new THREE.Mesh(geometry,material);
 body.scale.set(1.12,1.10,1.04);
 scene.add(body);
